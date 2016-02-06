@@ -1,0 +1,115 @@
+# My First Python Project
+# Simple Battleship Game
+# Written by Isaac Ahouma on Feb, 6th 2016 
+# Any tips on improving code structure or functionalities wlecome!
+
+def battleship():
+    from random import randint
+    
+    board = []
+    
+    level = raw_input("Which level do you want to play?")
+    tag = "level " + level
+    
+    
+    difficulty = { "level 1": 5, "level 2": 10, "level 3": 15,
+    "level 4": 20, "level 5": 25}
+    
+    number_of_ships = { "level 1": 3, "level 2":2, "level 3": 2,
+    "level 4": 1, "level 5": 1}
+    
+    def choose_difficulty(tag):
+        return difficulty[tag]
+        
+    
+    def choose_number_of_ships(tag):
+        return number_of_ships[tag]
+    
+    for x in range(choose_difficulty(tag)):
+        board.append(["O"] * choose_difficulty(tag))
+    
+    def print_board(board):
+        for row in board:
+            print " ".join(row)
+    
+    print "Let's play Battleship!"
+    print_board(board)
+    
+    def random_row(board):
+        rows = []
+        for i in range(1000):
+            a = randint(0, len(board) - 1)
+            if a not in rows:
+                rows.append(a)
+            if len(rows) == choose_number_of_ships(tag):
+                break
+        return rows
+    
+    def random_col(board):
+        cols = []
+        for i in range(1000):
+            a = randint(0, len(board) - 1)
+            if a not in cols:
+                cols.append(a)
+            if len(cols) == choose_number_of_ships(tag):
+                break
+        return cols
+    
+    ship_row = random_row(board)
+    ship_col = random_col(board)
+    
+    
+    
+    # print ship_row
+    # print ship_col
+    
+
+    
+    ships = choose_number_of_ships(tag)
+    
+    for turn in range(1,5):
+        print "Turn", turn
+        guess_row = int(raw_input("Guess Row:"))
+        guess_col = int(raw_input("Guess Col:"))
+        
+        if guess_row in ship_row:
+            i = ship_row.index(guess_row)
+        else:
+            i = -1
+        if guess_col in ship_col:
+            j = ship_col.index(guess_col)
+        else:
+            j = -4
+        
+        if i == j:
+            print "Congratulations! You sunk my battleship!"
+            ships = ships - 1;
+            if ships == 0:
+                print "Congratulations! You have won the game!"
+                b = raw_input("Would you like to play again?: ")
+                if b == "Yes":
+                    battleship()
+                else:
+                    print "Come play with us again soon!"
+                break
+                       
+        else:
+            if (guess_row < 0 or guess_row > len(board) - 1) or (guess_col < 0  or guess_col > len(board) - 1):
+                print "Oops, that's not even in the ocean."
+                
+            elif(board[guess_row][guess_col] == "X"):
+                print "You guessed that one already."
+                
+            else:
+                print "You missed my battleship!"
+                board[guess_row][guess_col] = "X"
+        
+                
+        print_board(board)
+        if turn == 4:
+            print "Game Over"
+            b = raw_input("Would you like to play again?: ")
+            if b == "Yes" or b == 'Y':
+                battleship()
+            else:
+                print "Come play with us again soon!"
