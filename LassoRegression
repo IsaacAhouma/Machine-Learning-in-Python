@@ -1,0 +1,231 @@
+# -*- coding: utf-8 -*-
+import pandas as pd
+from sklearn import linear_model  # using scikit-learn
+import numpy as np
+from RegressionHelpers import predict,get_numpy_data,normalize_features
+
+#### Lasso Regression Exercices completed as part of the Regression course of the Coursera Machine Learning Specialization ####
+
+dtype_dict = {'bathrooms':float, 'waterfront':int, 'sqft_above':int, 'sqft_living15':float, 'grade':int, 'yr_renovated':int, 'price':float, 'bedrooms':float, 'zipcode':str, 'long':float, 'sqft_lot15':float, 'sqft_living':float, 'floors':float, 'condition':int, 'lat':float, 'date':str, 'sqft_basement':int, 'yr_built':int, 'id':str, 'sqft_lot':int, 'view':int}
+    
+sales = pd.read_csv('kc_house_data.csv', dtype=dtype_dict)
+
+from math import  sqrt
+sales['sqft_living_sqrt'] = sales['sqft_living'].apply(sqrt)
+sales['sqft_lot_sqrt'] = sales['sqft_lot'].apply(sqrt)
+sales['bedrooms_square'] = sales['bedrooms']*sales['bedrooms']
+sales['floors_square'] = sales['floors']*sales['floors']
+
+all_features = ['bedrooms', 'bedrooms_square',
+            'bathrooms',
+            'sqft_living', 'sqft_living_sqrt',
+            'sqft_lot', 'sqft_lot_sqrt',
+            'floors', 'floors_square',
+            'waterfront', 'view', 'condition', 'grade',
+            'sqft_above',
+            'sqft_basement',
+            'yr_built', 'yr_renovated']
+
+model_all = linear_model.Lasso(alpha=5e2, normalize=True) # set parameters
+model_all.fit(sales[all_features], sales['price']) # learn weights
+
+important_features=[]
+for i in range(len(model_all.coef_)):
+    if (model_all.coef_[i] != 0):
+        important_features.append(all_features[i])
+# ['sqft_living', 'view', 'grade']
+
+
+testing = pd.read_csv('wk3_kc_house_test_data.csv', dtype=dtype_dict)
+training = pd.read_csv('wk3_kc_house_train_data.csv', dtype=dtype_dict)
+validation = pd.read_csv('wk3_kc_house_valid_data.csv', dtype=dtype_dict)
+
+testing['sqft_living_sqrt'] = testing['sqft_living'].apply(sqrt)
+testing['sqft_lot_sqrt'] = testing['sqft_lot'].apply(sqrt)
+testing['bedrooms_square'] = testing['bedrooms']*testing['bedrooms']
+testing['floors_square'] = testing['floors']*testing['floors']
+
+training['sqft_living_sqrt'] = training['sqft_living'].apply(sqrt)
+training['sqft_lot_sqrt'] = training['sqft_lot'].apply(sqrt)
+training['bedrooms_square'] = training['bedrooms']*training['bedrooms']
+training['floors_square'] = training['floors']*training['floors']
+
+validation['sqft_living_sqrt'] = validation['sqft_living'].apply(sqrt)
+validation['sqft_lot_sqrt'] = validation['sqft_lot'].apply(sqrt)
+validation['bedrooms_square'] = validation['bedrooms']*validation['bedrooms']
+validation['floors_square'] = validation['floors']*validation['floors']
+
+lambdas=np.logspace(1, 7, num=13)
+
+def find_best_lambda(training,validation,testing,features,target,lambdas):
+    min_rss_valid=10**100
+    my_rss=[]
+    for i in range(len(lambdas)):
+        model = linear_model.Lasso(alpha=lambdas[i], normalize=True)
+        model.fit(training[features], training[target])
+        rss = sum((model.predict(validation[features])-validation[target])**2)
+        my_rss.append(rss)
+        if rss < min_rss_valid:
+            min_rss_valid=rss
+            opt_lambda= lambdas[i]
+            best_model = model
+            rss_test=sum((model.predict(testing[features])-testing[target])**2)
+    return min_rss_valid,opt_lambda,best_model,rss_test,my_rss
+        
+min_rss,opt_lambda,best_model,rss_test,my_rss=find_best_lambda(training,validation,testing,all_features,'price',lambdas)
+
+
+np.count_nonzero(best_model.coef_) + np.count_nonzero(best_model.intercept_) #15
+
+max_nonzeros = 7
+l1_penalty_values = np.logspace(1, 4, num=20)
+
+def lambda_analysis(training,validation,testing,features,target,lambdas,max_nonzeros):
+    values=[]
+    lambdas_equal_nonzero=[]
+    for i in range(len(lambdas)):
+        model = linear_model.Lasso(alpha=lambdas[i], normalize=True)
+        model.fit(training[features], training[target])
+        num_nonzeros=np.count_nonzero(model.coef_) + np.count_nonzero(model.intercept_)
+        values.append(num_nonzeros)
+        if num_nonzeros > max_nonzeros:
+            lambda_max=lambdas[i]
+        else:
+            lambda_min = lambdas[i]
+            if num_nonzeros == max_nonzeros:
+                lambdas_equal_nonzero.append(lambdas[i])
+        
+    return lambda_max,lambda_min,lambdas_equal_nonzero,values
+
+lambda_max,lambda_min,vals,morevals=lambda_analysis(training,validation,testing,all_features,'price',l1_penalty_values,max_nonzeros)
+        #lambda_min=10000.0  #lambda_max=127.42749857031335
+my_lambdas=l1_penalty_values[8:]
+
+lambdas=np.linspace(lambda_min,lambda_max,20)
+new_min_rss,new_opt_lambda,new_best_model,new_rss_test,new_my_rss=find_best_lambda(training,validation,testing,all_features,'price',my_lambdas)
+
+# new_opt_lambda=183.29807108324357
+
+important_features=[]
+for i in range(len(new_best_model.coef_)):
+    if (new_best_model.coef_[i] != 0):
+        important_features.append(all_features[i])
+
+#['bathrooms', 'sqft_living', 'waterfront', 'view', 'grade', 'yr_built']
+
+### Example ###
+simple_features = ['sqft_living', 'bedrooms']
+my_output = 'price'
+(simple_feature_matrix, output) = get_numpy_data(sales, simple_features, my_output)
+simple_feature_matrix, norms = normalize_features(simple_feature_matrix)
+weights = np.array([1., 4., 1.])
+prediction =predict(simple_feature_matrix,weights)
+
+###########################
+
+## Compute optimal weight for feature_i via on coordinate descent algorithm
+def lasso_coordinate_descent_step(i, feature_matrix, output, weights, l1_penalty):
+    
+    prediction = predict(feature_matrix,weights)
+    ro_i=sum(feature_matrix[:,i]*(output-prediction+weights[i]*feature_matrix[:,i]))
+    if i==0:
+        new_weight_i=ro_i
+    elif ro_i < -l1_penalty/2:
+        new_weight_i=ro_i+l1_penalty/2
+    elif ro_i > l1_penalty/2:
+        new_weight_i=ro_i-l1_penalty/2
+    else:
+        new_weight_i=0.0
+    return new_weight_i
+
+# Compute vector of optimal weights for a lasso fit using cyclical coordinate descent algorithm
+def lasso_cyclical_coordinate_descent(feature_matrix, output, initial_weights, l1_penalty, tolerance):
+    weights = initial_weights
+    change=np.zeros(len(feature_matrix[0]))+100
+    count = 0
+    max_steps=10000
+    while max(change)>tolerance:
+        for j in range(max_steps):
+            count=count+1
+            for i in range(len(weights)):
+                old_weights=weights
+                weights[i]=lasso_coordinate_descent_step(i, feature_matrix, output, weights, l1_penalty)
+                change[i]=abs(old_weights[i]-weights[i])
+            
+            #if max(change)<tolerance:
+            #    break
+    return weights,count
+
+
+initial_weights=np.zeros(len(simple_feature_matrix[0]))
+res,count0=lasso_cyclical_coordinate_descent(simple_feature_matrix, output, initial_weights,1e7,1.0)
+print res
+# array([ 21624997.24022756,  63157247.86588661,         0.        ]) bedrooms
+
+predictions=np.dot(simple_feature_matrix,res)
+rss=sum((predictions-output)**2)
+my_features = ['bedrooms',
+                'bathrooms',
+                'sqft_living',
+                'sqft_lot',
+                'floors',
+                'waterfront', 
+                'view', 
+                'condition', 
+                'grade',
+                'sqft_above',
+                'sqft_basement',
+                'yr_built', 
+                'yr_renovated']
+my_features2=['constant']+my_features
+
+(feature_matrix, output) = get_numpy_data(training, my_features, my_output)
+feature_matrix, norms = normalize_features(feature_matrix)
+
+
+initial_weights=np.zeros(len(feature_matrix[0]))
+weights1e7,count1=lasso_cyclical_coordinate_descent(feature_matrix, output, initial_weights,1e7,1.0)
+
+important_features1e7=[]
+for i in range(len(weights1e7)):
+    if (weights1e7[i] != 0):
+        important_features1e7.append(my_features2[i])
+
+#['constant', 'sqft_living', 'waterfront', 'view']
+
+initial_weights=np.zeros(len(feature_matrix[0]))
+weights1e4,count2=lasso_cyclical_coordinate_descent(feature_matrix, output, initial_weights,1e4,1.0)
+
+important_features1e4=[]
+for i in range(len(weights1e4)):
+    if (weights1e4[i] != 0):
+        important_features1e4.append(my_features2[i])
+# 'view'
+initial_weights=np.zeros(len(feature_matrix[0]))
+weights1e8,count3=lasso_cyclical_coordinate_descent(feature_matrix, output, initial_weights,1e8,1.0)
+
+important_features1e8=[]
+for i in range(len(weights1e8)):
+    if (weights1e8[i] != 0):
+        important_features1e8.append(my_features2[i])
+# ['constant']
+
+weights1e7_normalized = weights1e7 / norms
+weights1e4_normalized = weights1e4 / norms
+weights1e8_normalized = weights1e8 / norms
+
+print weights1e7_normalized[3]
+
+(test_matrix, test_output) = get_numpy_data(testing, my_features, my_output)
+
+prediction1e7 =predict(test_matrix,weights1e7_normalized)
+prediction1e4 =predict(test_matrix,weights1e4_normalized)
+prediction1e8 =predict(test_matrix,weights1e8_normalized)
+
+rss1e7=sum((prediction1e7-test_output)**2)
+rss1e4=sum((prediction1e4-test_output)**2)
+rss1e8=sum((prediction1e8-test_output)**2)
+
+rss1e7 <rss1e8
+rss1e4 <rss1e7
+# lowest rss is rss1e4
